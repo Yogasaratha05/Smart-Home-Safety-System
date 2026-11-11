@@ -1,0 +1,84 @@
+
+const int PIR_PIN = 2;       
+const int GAS_PIN = A0;
+const int LIGHT1 = 8;
+const int LIGHT2 = 9;
+const int LIGHT3 = 10;
+const int RED_LED = 11;
+const int BUZZER = 12;
+
+const int GAS_THRESHOLD = 400;
+
+volatile bool motionDetected = false;
+
+unsigned long lastMotionTime = 0;
+unsigned long lastFlashTime = 0;
+
+bool redLedState = false;
+const unsigned long LIGHT_DURATION = 10000;
+
+void motionISR() {
+  motionDetected = true;
+}
+
+void setup() {
+  Serial.begin(9600);
+
+  pinMode(PIR_PIN, INPUT);
+  pinMode(LIGHT1, OUTPUT);
+  pinMode(LIGHT2, OUTPUT);
+  pinMode(LIGHT3, OUTPUT);
+  pinMode(RED_LED, OUTPUT);
+  pinMode(BUZZER, OUTPUT);
+
+  attachInterrupt(digitalPinToInterrupt(PIR_PIN),
+                  motionISR, RISING);
+
+  Serial.println("Smart Home Safety System Started");
+}
+
+void loop() {
+  int gasValue = analogRead(GAS_PIN);
+
+  Serial.print("Gas Value: ");
+  Serial.println(gasValue);
+
+  // Safety override
+  if (gasValue > GAS_THRESHOLD) {
+    digitalWrite(LIGHT1, LOW);
+    digitalWrite(LIGHT2, LOW);
+    digitalWrite(LIGHT3, LOW);
+
+    tone(BUZZER, 1000);
+
+    if (millis() - lastFlashTime >= 250) {
+      lastFlashTime = millis();
+      redLedState = !redLedState;
+      digitalWrite(RED_LED, redLedState);
+    }
+
+    motionDetected = false;
+    Serial.println("DANGER! GAS DETECTED");
+    return;
+  }
+
+  // Normal operation
+  noTone(BUZZER);
+  digitalWrite(RED_LED, LOW);
+
+  if (motionDetected) {
+    lastMotionTime = millis();
+    motionDetected = false;
+    Serial.println("Motion Detected - Lights ON");
+  }
+
+  if (millis() - lastMotionTime < LIGHT_DURATION) {
+    digitalWrite(LIGHT1, HIGH);
+    digitalWrite(LIGHT2, HIGH);
+    digitalWrite(LIGHT3, HIGH);
+  } else {
+    digitalWrite(LIGHT1, LOW);
+    digitalWrite(LIGHT2, LOW);
+    digitalWrite(LIGHT3, LOW);
+  }
+}
